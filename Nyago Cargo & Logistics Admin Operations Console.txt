@@ -1,0 +1,1988 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import {
+  Shield,
+  Plane,
+  Ship,
+  Search,
+  Plus,
+  Download,
+  Edit,
+  Trash2,
+  Printer,
+  ChevronRight,
+  TrendingUp,
+  Package,
+  CheckCircle,
+  Clock,
+  X,
+  AlertCircle,
+  RefreshCw,
+  BarChart3,
+  FileSpreadsheet,
+  PackagePlus,
+  Terminal,
+  MapPin,
+  Calendar,
+  Share2,
+  Check,
+  Copy,
+  DollarSign,
+  ShieldCheck,
+  Layers,
+  ArrowRight,
+  Calculator,
+  Radio
+} from 'lucide-react';
+
+// ==========================================
+// 1. SUPABASE CLIENT & CONFIGURATION
+// ==========================================
+const SUPABASE_DEFAULT_URL = 'https://fhicvviisrglsgtilldj.supabase.co';
+const SUPABASE_DEFAULT_ANON_KEY = 'sb_publishable_WwB3SNgwcijKa30-klcEvQ_YlgU5tNE';
+
+const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || SUPABASE_DEFAULT_URL;
+const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || SUPABASE_DEFAULT_ANON_KEY;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
+
+const FREIGHT_RATES = {
+  airFreightPerKg: 23,
+  seaFreightPerKg: 13,
+  handlingFee: 25,
+  insuranceRate: 0.02,
+};
+
+const EXCHANGE_RATES = {
+  SAR_TO_USD: 0.267,
+  SAR_TO_UGX: 1015,
+  SAR_TO_KES: 34.8,
+  SAR_TO_TZS: 710,
+  SAR_TO_RWF: 365,
+};
+
+const STATUS_STEPS = [
+  'Booking Created',
+  'Received at KSA Hub',
+  'Customs Cleared (KSA ZATCA)',
+  'In Transit',
+  'Arrived at Destination Port/Airport',
+  'Customs Cleared (East Africa)',
+  'Out for Delivery / Ready for Pickup',
+  'Delivered',
+];
+
+const INITIAL_FALLBACK_SHIPMENTS = [
+  {
+    id: 'ship-101',
+    tracking_id: 'NYG-849201',
+    user_email: 'ismail@mukasa.com',
+    sender_name: 'Ismail Mukasa',
+    sender_phone: '+966 57 066 4167',
+    sender_city: 'Riyadh',
+    sender_id_iqama: '2498104829',
+    receiver_name: 'Grace Nalubega',
+    receiver_phone: '+256 706 305 303',
+    receiver_country: 'Uganda',
+    receiver_city: 'Kampala',
+    receiver_address: 'Plot 14 Kimathi Avenue, Nakasero Business Park',
+    cargo_type: 'Air Freight',
+    weight_kg: 28.5,
+    package_type: 'Carton Box',
+    package_count: 2,
+    goods_description: 'Laptop computers, tablets, and spare mobile screens',
+    declared_value_sar: 4200,
+    rate_per_kg: 23,
+    base_cost_sar: 655.5,
+    handling_fee_sar: 25,
+    insurance_fee_sar: 84,
+    total_cost_sar: 764.5,
+    payment_status: 'Paid',
+    payment_method: 'Mada / STC Pay',
+    current_status: 'In Transit',
+    estimated_delivery: '2026-10-26',
+    created_at: '2026-10-22T08:30:00Z',
+    updated_at: '2026-10-23T14:15:00Z',
+    events: [
+      {
+        id: 'evt-101-1',
+        timestamp: '2026-10-22T08:30:00Z',
+        status: 'Booking Created',
+        location: 'Riyadh Batha Drop-off Depot',
+        notes: 'Consignment received and weighed. 2 packages barcoded.',
+        updatedBy: 'Ahmed Al-Harbi (Logistics Officer)',
+      },
+      {
+        id: 'evt-101-2',
+        timestamp: '2026-10-22T15:40:00Z',
+        status: 'Received at KSA Hub',
+        location: 'Riyadh Central Cargo Terminal 2',
+        notes: 'Security X-ray screening cleared. Repacked in heavy-duty tamper-proof carton.',
+        updatedBy: 'Tariq Mansoor',
+      },
+      {
+        id: 'evt-101-3',
+        timestamp: '2026-10-23T04:20:00Z',
+        status: 'Customs Cleared (KSA ZATCA)',
+        location: 'King Khalid International Airport (RUH)',
+        notes: 'Export customs manifest processed under ZATCA guidelines.',
+        updatedBy: 'ZATCA Air Clearance Desk',
+      },
+      {
+        id: 'evt-101-4',
+        timestamp: '2026-10-23T14:15:00Z',
+        status: 'In Transit',
+        location: 'Flight RUH to Entebbe Airport (EBB)',
+        notes: 'Consignment loaded aboard Saudia Cargo Flight SV-844.',
+        carrierRef: 'Saudia Cargo SV-844',
+        updatedBy: 'Air Cargo Operations',
+      },
+    ],
+  },
+  {
+    id: 'ship-102',
+    tracking_id: 'NYG-302194',
+    user_email: 'farooq@ghamdi.sa',
+    sender_name: 'Farooq Al-Ghamdi & Sons',
+    sender_phone: '+966 50 192 8374',
+    sender_city: 'Jeddah',
+    sender_id_iqama: '1092847192',
+    receiver_name: 'Mwangi Kibaki Logistics Ltd',
+    receiver_phone: '+254 711 839 201',
+    receiver_country: 'Kenya',
+    receiver_city: 'Nairobi',
+    receiver_address: 'Enterprise Road, Industrial Area Shed 9',
+    cargo_type: 'Sea Freight',
+    weight_kg: 340,
+    package_type: 'Wooden Crate',
+    package_count: 4,
+    goods_description: 'Industrial pump motors, mechanical valves, and automotive filters',
+    declared_value_sar: 18500,
+    rate_per_kg: 13,
+    base_cost_sar: 4420,
+    handling_fee_sar: 25,
+    insurance_fee_sar: 370,
+    total_cost_sar: 4815,
+    payment_status: 'Paid',
+    payment_method: 'Corporate Bank Transfer (Al Rajhi)',
+    current_status: 'Arrived at Destination Port/Airport',
+    estimated_delivery: '2026-10-28',
+    created_at: '2026-10-02T11:00:00Z',
+    updated_at: '2026-10-23T09:45:00Z',
+    events: [
+      {
+        id: 'evt-102-1',
+        timestamp: '2026-10-02T11:00:00Z',
+        status: 'Booking Created',
+        location: 'Jeddah Al Balad Freight Center',
+        notes: 'Consignment registered for 40ft High-Cube container consolidation.',
+        updatedBy: 'Omar Al-Juhani',
+      },
+      {
+        id: 'evt-102-2',
+        timestamp: '2026-10-08T18:00:00Z',
+        status: 'In Transit',
+        location: 'Red Sea / Indian Ocean Maritime Lane',
+        notes: 'Vessel MSC Aurelia departed Jeddah Islamic Port bound for Port of Mombasa.',
+        carrierRef: 'MSC Aurelia Voy 24B',
+        updatedBy: 'Maersk/MSC Operations',
+      },
+      {
+        id: 'evt-102-3',
+        timestamp: '2026-10-23T09:45:00Z',
+        status: 'Arrived at Destination Port/Airport',
+        location: 'Port of Mombasa Berth 21, Kenya',
+        notes: 'Vessel berthed. Offloaded to KPA Inland Container Depot.',
+        carrierRef: 'KPA Mombasa Terminal',
+        updatedBy: 'Nicholas Omondi',
+      },
+    ],
+  },
+  {
+    id: 'ship-103',
+    tracking_id: 'NYG-671295',
+    user_email: 'ismail@mukasa.com',
+    sender_name: 'Ismail Mukasa',
+    sender_phone: '+966 57 066 4167',
+    sender_city: 'Dammam',
+    sender_id_iqama: '2498104829',
+    receiver_name: 'Patrick Kateregga',
+    receiver_phone: '+256 706 305 303',
+    receiver_country: 'Uganda',
+    receiver_city: 'Kampala',
+    receiver_address: 'Kikuubo Commercial Arcade, Shop B-19',
+    cargo_type: 'Air Freight',
+    weight_kg: 18.2,
+    package_type: 'Suitcase / Bag',
+    package_count: 1,
+    goods_description: 'Arabian perfume oils, abayas, and textiles',
+    declared_value_sar: 2100,
+    rate_per_kg: 23,
+    base_cost_sar: 418.6,
+    handling_fee_sar: 25,
+    insurance_fee_sar: 42,
+    total_cost_sar: 485.6,
+    payment_status: 'Paid',
+    payment_method: 'Cash at Dammam Hub',
+    current_status: 'Delivered',
+    estimated_delivery: '2026-10-22',
+    created_at: '2026-10-18T10:15:00Z',
+    updated_at: '2026-10-22T16:30:00Z',
+    events: [
+      {
+        id: 'evt-103-1',
+        timestamp: '2026-10-18T10:15:00Z',
+        status: 'Booking Created',
+        location: 'Dammam Al Khobar Branch',
+        notes: 'Personal effects received and weighed.',
+        updatedBy: 'Fahad Al-Dossari',
+      },
+      {
+        id: 'evt-103-2',
+        timestamp: '2026-10-22T16:30:00Z',
+        status: 'Delivered',
+        location: 'Nyago Express Hub, Kampala Nakasero',
+        notes: 'Collected in person by Patrick Kateregga. National ID verified.',
+        updatedBy: 'Brian Kibuuka',
+      },
+    ],
+  },
+];
+
+function generateTrackingCode() {
+  const randomSix = Math.floor(100000 + Math.random() * 900000);
+  return `NYG-${randomSix}`;
+}
+
+// ==========================================
+// 2. MAIN ADMIN APP COMPONENT
+// ==========================================
+export default function AdminApp() {
+  const [activeTab, setActiveTab] = useState('manifest'); // 'manifest' | 'intake' | 'analytics'
+  const [shipments, setShipments] = useState(() => {
+    try {
+      const stored = localStorage.getItem('nyago_admin_shipments_v3');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    return INITIAL_FALLBACK_SHIPMENTS;
+  });
+
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [selectedWaybillShipment, setSelectedWaybillShipment] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = useCallback((msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  }, []);
+
+  // Fetch from Supabase and listen for real-time changes
+  const fetchShipments = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        setShipments(data);
+        localStorage.setItem('nyago_admin_shipments_v3', JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn('Initial fetch using local cache:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchShipments();
+
+    // Supabase Realtime WebSocket subscription
+    const channel = supabase
+      .channel('nyago_admin_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shipments' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setShipments((prev) => {
+              const exists = prev.some(
+                (s) => s.id === payload.new.id || s.tracking_id === payload.new.tracking_id
+              );
+              if (exists) return prev;
+              const updated = [payload.new, ...prev];
+              localStorage.setItem('nyago_admin_shipments_v3', JSON.stringify(updated));
+              return updated;
+            });
+            showToast(`New client consignment received: ${payload.new.tracking_id}`);
+          } else if (payload.eventType === 'UPDATE') {
+            setShipments((prev) => {
+              const updated = prev.map((item) =>
+                item.id === payload.new.id || item.tracking_id === payload.new.tracking_id
+                  ? payload.new
+                  : item
+              );
+              localStorage.setItem('nyago_admin_shipments_v3', JSON.stringify(updated));
+              return updated;
+            });
+            showToast(`Consignment ${payload.new.tracking_id} updated: ${payload.new.current_status}`);
+          } else if (payload.eventType === 'DELETE') {
+            setShipments((prev) => {
+              const updated = prev.filter((item) => item.id !== payload.old.id);
+              localStorage.setItem('nyago_admin_shipments_v3', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        setIsLiveConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchShipments, showToast]);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900 border border-amber-500/50 text-amber-400 px-4 py-3 rounded-2xl shadow-2xl text-xs font-semibold animate-in fade-in slide-in-from-top-2">
+          <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Top Operations Header */}
+      <header className="sticky top-0 z-40 bg-slate-900 border-b border-amber-500/30 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md shadow-amber-500/20">
+              <Shield className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-extrabold text-white tracking-tight uppercase">
+                  NYAGO OPERATIONS
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-amber-500 text-slate-950 px-2 py-0.5 rounded">
+                  DISPATCH CONSOLE
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-medium tracking-wide flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${isLiveConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>Riyadh Central (RUH) &bull; Jeddah Port Dispatch &bull; {isLiveConnected ? 'Supabase Live' : 'Connecting...'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-1 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setActiveTab('manifest')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === 'manifest'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Consignment Manifest
+              <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-300">
+                {shipments.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('intake')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === 'intake'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <PackagePlus className="w-4 h-4" />
+              Counter Intake Desk
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === 'analytics'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics &amp; KPIs
+            </button>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchShipments}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Force reload shipments"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Operations Desk Banner */}
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <Terminal className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white uppercase tracking-wider">
+                Logistics Dispatch Operations Console
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Authorized Officer Desk &bull; Direct interconnect with KSA ZATCA export gate &amp; East Africa port manifolds
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-mono text-amber-400 font-semibold">{shipments.length} consignments on file</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Workspace Area */}
+      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeTab === 'manifest' && (
+          <AdminManifestView
+            shipments={shipments}
+            onOpenWaybill={(s) => setSelectedWaybillShipment(s)}
+            onOpenNewBooking={() => setActiveTab('intake')}
+            showToast={showToast}
+          />
+        )}
+
+        {activeTab === 'intake' && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Walk-in Counter Cargo Registration</h2>
+                <p className="text-xs text-slate-400">
+                  Register walk-in consignments directly into Supabase with live AWB generation.
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('manifest')}
+                className="text-xs text-slate-400 hover:text-white"
+              >
+                &larr; Back to Manifest
+              </button>
+            </div>
+            <AdminIntakeBookingView
+              onBookingSuccess={(newShipment) => {
+                setSelectedWaybillShipment(newShipment);
+                setActiveTab('manifest');
+                showToast(`New walk-in booking created: ${newShipment.tracking_id}`);
+              }}
+            />
+          </div>
+        )}
+
+        {activeTab === 'analytics' && <AdminAnalyticsView shipments={shipments} />}
+      </main>
+
+      {/* Official Waybill Modal */}
+      {selectedWaybillShipment && (
+        <OfficialWaybillModal
+          shipment={selectedWaybillShipment}
+          onClose={() => setSelectedWaybillShipment(null)}
+        />
+      )}
+
+      {/* Footer */}
+      <footer className="no-print bg-slate-900 border-t border-slate-800 mt-16 py-6 text-slate-500 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-amber-500" />
+            <span>Nyago Cargo Internal Operations Console &bull; KSA Customs ZATCA &amp; URA/KRA Interconnect</span>
+          </div>
+          <div>
+            <span>Connected to Database: <strong className="text-slate-400 font-mono">fhicvviisrglsgtilldj.supabase.co</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ==========================================
+// 3. ADMIN MANIFEST WORKSPACE VIEW
+// ==========================================
+function AdminManifestView({ shipments, onOpenWaybill, onOpenNewBooking, showToast }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [modeFilter, setModeFilter] = useState('ALL');
+  const [countryFilter, setCountryFilter] = useState('ALL');
+
+  // Status edit modal state
+  const [editingShipment, setEditingShipment] = useState(null);
+  const [newStatus, setNewStatus] = useState('In Transit');
+  const [customLocation, setCustomLocation] = useState('');
+  const [customNotes, setCustomNotes] = useState('');
+  const [carrierRef, setCarrierRef] = useState('');
+  const [agentName, setAgentName] = useState('Operations Officer');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [actionError, setActionError] = useState(null);
+
+  // KPIs
+  const kpis = useMemo(() => {
+    const totalCount = shipments.length;
+    const inTransit = shipments.filter((s) => s.current_status === 'In Transit').length;
+    const customs = shipments.filter(
+      (s) =>
+        s.current_status === 'Customs Cleared (KSA ZATCA)' ||
+        s.current_status === 'Arrived at Destination Port/Airport' ||
+        s.current_status === 'Customs Cleared (East Africa)'
+    ).length;
+    const delivered = shipments.filter((s) => s.current_status === 'Delivered').length;
+    const pendingIntake = shipments.filter(
+      (s) => s.current_status === 'Booking Created' || s.current_status === 'Received at KSA Hub'
+    ).length;
+    const totalRevenueSar = shipments.reduce((acc, s) => acc + (Number(s.total_cost_sar) || 0), 0);
+    const totalWeightKg = shipments.reduce((acc, s) => acc + (Number(s.weight_kg) || 0), 0);
+    const airVolumeKg = shipments
+      .filter((s) => s.cargo_type === 'Air Freight')
+      .reduce((acc, s) => acc + (Number(s.weight_kg) || 0), 0);
+    const seaVolumeKg = shipments
+      .filter((s) => s.cargo_type === 'Sea Freight')
+      .reduce((acc, s) => acc + (Number(s.weight_kg) || 0), 0);
+
+    return {
+      totalCount,
+      inTransit,
+      customs,
+      delivered,
+      pendingIntake,
+      totalRevenueSar,
+      totalWeightKg,
+      airVolumeKg,
+      seaVolumeKg,
+    };
+  }, [shipments]);
+
+  // Filtered shipments
+  const filteredShipments = useMemo(() => {
+    return shipments.filter((s) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        searchQuery === '' ||
+        s.tracking_id?.toLowerCase().includes(q) ||
+        s.sender_name?.toLowerCase().includes(q) ||
+        s.receiver_name?.toLowerCase().includes(q) ||
+        s.receiver_city?.toLowerCase().includes(q) ||
+        s.sender_phone?.includes(searchQuery) ||
+        s.receiver_phone?.includes(searchQuery);
+
+      const matchesStatus = statusFilter === 'ALL' || s.current_status === statusFilter;
+      const matchesMode = modeFilter === 'ALL' || s.cargo_type === modeFilter;
+      const matchesCountry = countryFilter === 'ALL' || s.receiver_country === countryFilter;
+
+      return matchesSearch && matchesStatus && matchesMode && matchesCountry;
+    });
+  }, [shipments, searchQuery, statusFilter, modeFilter, countryFilter]);
+
+  // Update Shipment Status via Supabase
+  const updateShipmentStatus = async (
+    trackingId,
+    targetStatus,
+    location,
+    notes,
+    carrierIdentifier,
+    officerName
+  ) => {
+    setIsUpdating(true);
+    setActionError(null);
+    try {
+      const { data: currentShipment, error: fetchErr } = await supabase
+        .from('shipments')
+        .select('events')
+        .eq('tracking_id', trackingId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      const newEvent = {
+        id: `evt-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        status: targetStatus,
+        location,
+        notes,
+        carrierRef: carrierIdentifier || undefined,
+        updatedBy: officerName || 'Nyago Operations Desk',
+      };
+
+      const updatedEvents = [newEvent, ...(currentShipment?.events || [])];
+
+      const { error: updateErr } = await supabase
+        .from('shipments')
+        .update({
+          current_status: targetStatus,
+          events: updatedEvents,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tracking_id', trackingId);
+
+      if (updateErr) throw updateErr;
+
+      showToast(`Consignment ${trackingId} transitioned to ${targetStatus}`);
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      setActionError(err.message || 'Failed to update consignment status.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleOpenStatusModal = (shipment) => {
+    setEditingShipment(shipment);
+    setNewStatus(shipment.current_status);
+    setCustomLocation(`${shipment.receiver_city} Hub`);
+    setCustomNotes(`Consignment status updated to ${shipment.current_status}.`);
+    setCarrierRef('');
+    setActionError(null);
+  };
+
+  const handleQuickAdvance = async (shipment) => {
+    const currentIndex = STATUS_STEPS.indexOf(shipment.current_status);
+    if (currentIndex < STATUS_STEPS.length - 1) {
+      const nextStep = STATUS_STEPS[currentIndex + 1];
+      const defaultLoc =
+        nextStep === 'Received at KSA Hub'
+          ? `${shipment.sender_city} Logistics Hub`
+          : nextStep === 'Customs Cleared (KSA ZATCA)'
+          ? `${shipment.sender_city} International Port/Airport ZATCA`
+          : nextStep === 'In Transit'
+          ? shipment.cargo_type === 'Air Freight'
+            ? 'Air Cargo Flight en route'
+            : 'Maritime vessel en route via Red Sea'
+          : nextStep === 'Arrived at Destination Port/Airport'
+          ? shipment.cargo_type === 'Air Freight'
+            ? 'Entebbe EBB / Nairobi NBO Airport'
+            : 'Port of Mombasa Berth'
+          : nextStep === 'Customs Cleared (East Africa)'
+          ? `${shipment.receiver_country} Revenue Authority Customs`
+          : nextStep === 'Out for Delivery / Ready for Pickup'
+          ? `Nyago Express Depot (${shipment.receiver_city})`
+          : `Delivered to ${shipment.receiver_name}`;
+
+      const defaultCarrier =
+        shipment.cargo_type === 'Air Freight' ? 'Direct Cargo Express' : 'Sea Container Consolidation';
+
+      await updateShipmentStatus(
+        shipment.tracking_id,
+        nextStep,
+        defaultLoc,
+        `Consignment advanced to ${nextStep}.`,
+        defaultCarrier,
+        'Nyago Admin Desk'
+      );
+    }
+  };
+
+  const handleSaveStatusUpdate = async (e) => {
+    e.preventDefault();
+    if (!editingShipment) return;
+
+    await updateShipmentStatus(
+      editingShipment.tracking_id,
+      newStatus,
+      customLocation || `${editingShipment.receiver_city} Station`,
+      customNotes || `Status updated to ${newStatus}`,
+      carrierRef,
+      agentName || 'Nyago Operations Desk'
+    );
+
+    setEditingShipment(null);
+  };
+
+  const handleDelete = async (trackingId) => {
+    if (window.confirm(`Are you sure you want to delete consignment ${trackingId}?`)) {
+      try {
+        const { error } = await supabase
+          .from('shipments')
+          .delete()
+          .eq('tracking_id', trackingId);
+
+        if (error) throw error;
+        showToast(`Consignment ${trackingId} removed.`);
+      } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = [
+      'Tracking ID',
+      'Freight Mode',
+      'Sender Name',
+      'Sender Phone',
+      'Origin City',
+      'Receiver Name',
+      'Receiver Phone',
+      'Destination Country',
+      'Destination City',
+      'Weight (kg)',
+      'Packages',
+      'Goods Description',
+      'Total SAR',
+      'Payment Status',
+      'Current Status',
+      'Created Date',
+    ];
+
+    const rows = shipments.map((s) => [
+      s.tracking_id,
+      s.cargo_type,
+      `"${s.sender_name || ''}"`,
+      `"${s.sender_phone || ''}"`,
+      s.sender_city || '',
+      `"${s.receiver_name || ''}"`,
+      `"${s.receiver_phone || ''}"`,
+      s.receiver_country || '',
+      `"${s.receiver_city || ''}"`,
+      s.weight_kg,
+      s.package_count,
+      `"${(s.goods_description || '').replace(/"/g, '""')}"`,
+      s.total_cost_sar,
+      s.payment_status,
+      `"${s.current_status || ''}"`,
+      s.created_at,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `nyago_cargo_manifest_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Action Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <h2 className="text-2xl font-bold text-white tracking-tight">Consignment Manifest Control</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Real-time tracking transition desk &bull; Changes reflect immediately on customer tracker
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-800 transition-colors"
+          >
+            <Download className="w-4 h-4 text-slate-400" />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={onOpenNewBooking}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Counter Booking
+          </button>
+        </div>
+      </div>
+
+      {actionError && (
+        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center gap-3 text-xs text-rose-300">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
+      {/* KPI Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Total Active Shipments</span>
+            <Package className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono tabular-nums">
+            {kpis.totalCount}
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono">
+            {kpis.pendingIntake} intake &bull; {kpis.inTransit} en route
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Consignment Revenue</span>
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono tabular-nums">
+            {kpis.totalRevenueSar.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+            <span className="text-xs font-normal text-slate-400">SAR</span>
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono">Billed &amp; collected freight</div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Gross Weight</span>
+            <Plane className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono tabular-nums">
+            {kpis.totalWeightKg.toLocaleString()} <span className="text-xs font-normal text-slate-400">kg</span>
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono">
+            Air: {kpis.airVolumeKg}kg &bull; Sea: {kpis.seaVolumeKg}kg
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Completed &amp; Delivered</span>
+            <CheckCircle className="w-4 h-4 text-sky-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono tabular-nums">
+            {kpis.delivered}
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono">
+            {kpis.customs} at customs/ports
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-md">
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tracking, sender, receiver, phone..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+          >
+            <option value="ALL">All Statuses</option>
+            {STATUS_STEPS.map((step) => (
+              <option key={step} value={step}>
+                {step}
+              </option>
+            ))}
+          </select>
+          <select
+            value={modeFilter}
+            onChange={(e) => setModeFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+          >
+            <option value="ALL">All Modes</option>
+            <option value="Air Freight">Air Freight (23 SAR)</option>
+            <option value="Sea Freight">Sea Freight (13 SAR)</option>
+          </select>
+          <select
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+          >
+            <option value="ALL">All Destinations</option>
+            <option value="Uganda">Uganda</option>
+            <option value="Kenya">Kenya</option>
+            <option value="Tanzania">Tanzania</option>
+            <option value="Rwanda">Rwanda</option>
+            <option value="South Sudan">South Sudan</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Manifest Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+              <tr>
+                <th className="py-3 px-4 font-semibold">Tracking ID</th>
+                <th className="py-3 px-4 font-semibold">Freight Mode</th>
+                <th className="py-3 px-4 font-semibold">Sender (Origin KSA)</th>
+                <th className="py-3 px-4 font-semibold">Receiver (East Africa)</th>
+                <th className="py-3 px-4 font-semibold text-right">Weight</th>
+                <th className="py-3 px-4 font-semibold text-right">Total (SAR)</th>
+                <th className="py-3 px-4 font-semibold">Milestone</th>
+                <th className="py-3 px-4 font-semibold text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80">
+              {filteredShipments.length > 0 ? (
+                filteredShipments.map((s) => (
+                  <tr key={s.id || s.tracking_id} className="hover:bg-slate-800/40 transition-colors group">
+                    <td className="py-3.5 px-4 font-mono font-bold text-amber-400 whitespace-nowrap">
+                      {s.tracking_id}
+                    </td>
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        {s.cargo_type === 'Air Freight' ? (
+                          <Plane className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        ) : (
+                          <Ship className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                        )}
+                        <span>{s.cargo_type}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-white truncate max-w-[140px]">
+                        {s.sender_name}
+                      </div>
+                      <div className="text-[11px] text-slate-400">{s.sender_city}, KSA</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-white truncate max-w-[140px]">
+                        {s.receiver_name}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {s.receiver_city}, {s.receiver_country}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono tabular-nums whitespace-nowrap">
+                      <span className="font-semibold text-white">{s.weight_kg} kg</span>
+                      <div className="text-[10px] text-slate-400">{s.package_count} pkgs</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono tabular-nums whitespace-nowrap">
+                      <span className="font-bold text-white">
+                        {Number(s.total_cost_sar || 0).toFixed(2)}
+                      </span>
+                      <div className="text-[10px] text-slate-400">{s.payment_status}</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${
+                            s.current_status === 'Delivered'
+                              ? 'bg-emerald-400'
+                              : s.current_status === 'In Transit'
+                              ? 'bg-amber-400'
+                              : s.current_status === 'Booking Created'
+                              ? 'bg-slate-400'
+                              : 'bg-sky-400'
+                          }`}
+                        />
+                        <span className="font-medium text-slate-200 truncate max-w-[160px]">
+                          {s.current_status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {s.current_status !== 'Delivered' && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAdvance(s)}
+                            disabled={isUpdating}
+                            title="Quick advance to next shipping milestone"
+                            className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(s)}
+                          title="Edit Status & Location"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenWaybill(s)}
+                          title="Print Air Waybill / Label"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(s.tracking_id)}
+                          title="Delete consignment"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
+                    No consignments matched your current search filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span>
+            Showing <strong className="text-white">{filteredShipments.length}</strong> of{' '}
+            <strong className="text-white">{shipments.length}</strong> consignments
+          </span>
+          <span className="text-slate-500">
+            Realtime updates broadcast to customers via Supabase WebSockets.
+          </span>
+        </div>
+      </div>
+
+      {/* Status Modal */}
+      {editingShipment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-white">Update Consignment Status</h3>
+                <div className="text-xs font-mono text-amber-400 mt-0.5">
+                  {editingShipment.tracking_id} &middot; {editingShipment.cargo_type}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingShipment(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStatusUpdate} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">New Milestone Status</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                >
+                  {STATUS_STEPS.map((step) => (
+                    <option key={step} value={step}>
+                      {step}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">Current Physical Location / Hub</label>
+                <input
+                  type="text"
+                  required
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="e.g. Entebbe Airport Cargo Bay or Kampala Central Hub"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">Carrier / Flight / Vessel Identifier</label>
+                <input
+                  type="text"
+                  value={carrierRef}
+                  onChange={(e) => setCarrierRef(e.target.value)}
+                  placeholder="e.g. Flight SV-844 or Container MSC Aurelia Voy 24B"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">Log / Audit Notes</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  placeholder="Describe checkpoint progress, customs release, or inspection notes..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">Updating Officer Name</label>
+                <input
+                  type="text"
+                  required
+                  value={agentName}
+                  onChange={(e) => setAgentName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingShipment(null)}
+                  className="px-4 py-2 text-slate-400 hover:text-white rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl transition-all"
+                >
+                  {isUpdating ? 'Saving...' : 'Save & Broadcast Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// 4. COUNTER INTAKE BOOKING WORKSPACE VIEW
+// ==========================================
+function AdminIntakeBookingView({ onBookingSuccess }) {
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('+966 ');
+  const [senderCity, setSenderCity] = useState('Riyadh');
+  const [senderIqama, setSenderIqama] = useState('');
+
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('+256 ');
+  const [receiverCountry, setReceiverCountry] = useState('Uganda');
+  const [receiverCity, setReceiverCity] = useState('Kampala');
+  const [receiverAddress, setReceiverAddress] = useState('Central Depot (Collection)');
+
+  const [cargoType, setCargoType] = useState('Air Freight');
+  const [weightKg, setWeightKg] = useState(15);
+  const [packageType, setPackageType] = useState('Carton Box');
+  const [packageCount, setPackageCount] = useState(1);
+  const [goodsDescription, setGoodsDescription] = useState('');
+  const [declaredValueSar, setDeclaredValueSar] = useState(500);
+  const [includeInsurance, setIncludeInsurance] = useState(true);
+  const [paymentStatus, setPaymentStatus] = useState('Paid');
+  const [paymentMethod, setPaymentMethod] = useState('Cash at Depot');
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  const calculations = useMemo(() => {
+    const ratePerKg = cargoType === 'Air Freight' ? FREIGHT_RATES.airFreightPerKg : FREIGHT_RATES.seaFreightPerKg;
+    const safeWeight = Math.max(0.5, Number(weightKg) || 0);
+    const baseCost = Math.round(safeWeight * ratePerKg * 100) / 100;
+    const handling = FREIGHT_RATES.handlingFee;
+    const insuranceFee = includeInsurance
+      ? Math.round((Math.max(0, Number(declaredValueSar) || 0) * FREIGHT_RATES.insuranceRate) * 100) / 100
+      : 0;
+    const totalSar = Math.round((baseCost + handling + insuranceFee) * 100) / 100;
+
+    return {
+      ratePerKg,
+      baseCost,
+      handling,
+      insuranceFee,
+      totalSar,
+    };
+  }, [cargoType, weightKg, includeInsurance, declaredValueSar]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMsg(null);
+
+    const trackingId = generateTrackingCode();
+    const now = new Date();
+    const deliveryDays = cargoType === 'Air Freight' ? 4 : 28;
+    const estDate = new Date();
+    estDate.setDate(now.getDate() + deliveryDays);
+
+    const initialEvent = {
+      id: `evt-${Date.now()}-1`,
+      timestamp: now.toISOString(),
+      status: 'Booking Created',
+      location: `${senderCity} Nyago Freight Depot`,
+      notes: `Walk-in registration at counter. ${packageCount} package(s), ${weightKg} kg (${cargoType}).`,
+      updatedBy: 'Operations Desk Officer',
+    };
+
+    const payload = {
+      tracking_id: trackingId,
+      cargo_type: cargoType,
+      sender_name: senderName.trim(),
+      sender_phone: senderPhone.trim(),
+      sender_city: senderCity,
+      sender_id_iqama: senderIqama.trim() || null,
+      receiver_name: receiverName.trim(),
+      receiver_phone: receiverPhone.trim(),
+      receiver_country: receiverCountry,
+      receiver_city: receiverCity.trim(),
+      receiver_address: receiverAddress.trim(),
+      package_type: packageType,
+      package_count: Number(packageCount) || 1,
+      weight_kg: Number(weightKg),
+      goods_description: goodsDescription.trim() || 'General merchandise',
+      declared_value_sar: Number(declaredValueSar) || 0,
+      rate_per_kg: calculations.ratePerKg,
+      base_cost_sar: calculations.baseCost,
+      handling_fee_sar: calculations.handling,
+      insurance_fee_sar: calculations.insuranceFee,
+      total_cost_sar: calculations.totalSar,
+      payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      current_status: 'Booking Created',
+      estimated_delivery: estDate.toISOString().split('T')[0],
+      events: [initialEvent],
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) onBookingSuccess(data);
+    } catch (err) {
+      console.warn('Supabase insert failed, local fallback:', err);
+      const fallback = {
+        ...payload,
+        id: `ship-${Date.now()}`,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+      onBookingSuccess(fallback);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {errorMsg && (
+        <div className="lg:col-span-12 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Form Fields (7 cols) */}
+      <div className="lg:col-span-7 space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+          <label className="block text-xs font-bold text-slate-300 uppercase">1. Mode Selection</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setCargoType('Air Freight')}
+              className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 ${
+                cargoType === 'Air Freight'
+                  ? 'bg-amber-500/10 border-amber-500 text-white'
+                  : 'bg-slate-950 border-slate-800 text-slate-400'
+              }`}
+            >
+              <Plane className="w-5 h-5 text-amber-400" />
+              <div>
+                <div className="font-bold text-white text-xs">Express Air Freight</div>
+                <div className="text-[10px] text-amber-400 font-mono">23 SAR / kg</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCargoType('Sea Freight')}
+              className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 ${
+                cargoType === 'Sea Freight'
+                  ? 'bg-sky-500/10 border-sky-500 text-white'
+                  : 'bg-slate-950 border-slate-800 text-slate-400'
+              }`}
+            >
+              <Ship className="w-5 h-5 text-sky-400" />
+              <div>
+                <div className="font-bold text-white text-xs">Consolidated Ocean Cargo</div>
+                <div className="text-[10px] text-sky-400 font-mono">13 SAR / kg</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Sender details */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 text-xs">
+          <label className="block font-bold text-slate-300 uppercase">2. Walk-in Consignor (KSA)</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-400 mb-1">Sender Name *</label>
+              <input
+                type="text"
+                required
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+                placeholder="Sender Name"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Sender Phone (KSA) *</label>
+              <input
+                type="tel"
+                required
+                value={senderPhone}
+                onChange={(e) => setSenderPhone(e.target.value)}
+                placeholder="+966 5X XXX XXXX"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Origin City Hub</label>
+              <select
+                value={senderCity}
+                onChange={(e) => setSenderCity(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              >
+                <option value="Riyadh">Riyadh Hub</option>
+                <option value="Jeddah">Jeddah Hub</option>
+                <option value="Dammam">Dammam Depot</option>
+                <option value="Mecca">Mecca</option>
+                <option value="Medina">Medina</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Iqama / Saudi ID</label>
+              <input
+                type="text"
+                value={senderIqama}
+                onChange={(e) => setSenderIqama(e.target.value)}
+                placeholder="10-digit ID"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Receiver details */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 text-xs">
+          <label className="block font-bold text-slate-300 uppercase">3. Consignee (East Africa)</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-400 mb-1">Receiver Name *</label>
+              <input
+                type="text"
+                required
+                value={receiverName}
+                onChange={(e) => setReceiverName(e.target.value)}
+                placeholder="Full Name"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Receiver Phone *</label>
+              <input
+                type="tel"
+                required
+                value={receiverPhone}
+                onChange={(e) => setReceiverPhone(e.target.value)}
+                placeholder="+256 7XX XXX XXX"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Destination Country</label>
+              <select
+                value={receiverCountry}
+                onChange={(e) => setReceiverCountry(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              >
+                <option value="Uganda">Uganda</option>
+                <option value="Kenya">Kenya</option>
+                <option value="Tanzania">Tanzania</option>
+                <option value="Rwanda">Rwanda</option>
+                <option value="South Sudan">South Sudan</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Delivery City</label>
+              <input
+                type="text"
+                required
+                value={receiverCity}
+                onChange={(e) => setReceiverCity(e.target.value)}
+                placeholder="Kampala / Nairobi"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-slate-400 mb-1">Address / Depot</label>
+              <input
+                type="text"
+                required
+                value={receiverAddress}
+                onChange={(e) => setReceiverAddress(e.target.value)}
+                placeholder="Central Collection Depot"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Cargo specifications */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 text-xs">
+          <label className="block font-bold text-slate-300 uppercase">4. Package Manifest</label>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-slate-400 mb-1">Weight (kg) *</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.5"
+                required
+                value={weightKg}
+                onChange={(e) => setWeightKg(parseFloat(e.target.value) || 0)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Package Format</label>
+              <select
+                value={packageType}
+                onChange={(e) => setPackageType(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              >
+                <option value="Carton Box">Carton Box</option>
+                <option value="Suitcase / Bag">Suitcase / Bag</option>
+                <option value="Wooden Crate">Wooden Crate</option>
+                <option value="Sack / Bale">Sack / Bale</option>
+                <option value="Industrial Pallet">Pallet</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Piece Count</label>
+              <input
+                type="number"
+                min="1"
+                value={packageCount}
+                onChange={(e) => setPackageCount(parseInt(e.target.value, 10) || 1)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-slate-400 mb-1">Goods Description *</label>
+              <input
+                type="text"
+                required
+                value={goodsDescription}
+                onChange={(e) => setGoodsDescription(e.target.value)}
+                placeholder="Electronics, spare parts, clothing..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1">Declared Value (SAR)</label>
+              <input
+                type="number"
+                min="0"
+                value={declaredValueSar}
+                onChange={(e) => setDeclaredValueSar(parseFloat(e.target.value) || 0)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing and Submit (5 cols) */}
+      <div className="lg:col-span-5 space-y-6">
+        <div className="sticky top-28 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-amber-500" />
+              Counter Rate Calculation
+            </h3>
+            <span className="font-mono text-xs text-amber-400">{cargoType}</span>
+          </div>
+
+          <div className="space-y-2.5 text-xs">
+            <div className="flex justify-between text-slate-300">
+              <span>Freight ({weightKg} kg &times; {calculations.ratePerKg} SAR):</span>
+              <span className="font-mono text-white font-bold">{calculations.baseCost.toFixed(2)} SAR</span>
+            </div>
+            <div className="flex justify-between text-slate-300">
+              <span>Intake &amp; Documentation:</span>
+              <span className="font-mono text-white font-bold">{calculations.handling.toFixed(2)} SAR</span>
+            </div>
+            {includeInsurance && (
+              <div className="flex justify-between text-slate-300">
+                <span>Insurance (2% of {declaredValueSar} SAR):</span>
+                <span className="font-mono text-white font-bold">{calculations.insuranceFee.toFixed(2)} SAR</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
+              <span className="font-bold text-white">Total Fee Billed:</span>
+              <span className="font-mono text-2xl font-black text-amber-400">
+                {calculations.totalSar.toFixed(2)} <span className="text-xs font-normal text-slate-400">SAR</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <label className="block text-slate-400 font-medium">Payment Settlement</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentStatus('Paid')}
+                className={`py-2 px-3 rounded-xl border font-bold ${
+                  paymentStatus === 'Paid'
+                    ? 'bg-amber-500 text-slate-950 border-amber-500'
+                    : 'bg-slate-950 text-slate-400 border-slate-800'
+                }`}
+              >
+                Paid at Counter
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatus('Pay on Delivery')}
+                className={`py-2 px-3 rounded-xl border font-bold ${
+                  paymentStatus === 'Pay on Delivery'
+                    ? 'bg-amber-500 text-slate-950 border-amber-500'
+                    : 'bg-slate-950 text-slate-400 border-slate-800'
+                }`}
+              >
+                Pay on Collection
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 text-xs transition-all flex items-center justify-center gap-2"
+          >
+            <PackagePlus className="w-4 h-4" />
+            {isSubmitting ? 'Registering Consignment...' : 'Book Walk-in Consignment'}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+// ==========================================
+// 5. ADMIN ANALYTICS WORKSPACE VIEW
+// ==========================================
+function AdminAnalyticsView({ shipments }) {
+  const stats = useMemo(() => {
+    const totalRevenue = shipments.reduce((sum, s) => sum + (Number(s.total_cost_sar) || 0), 0);
+    const airRevenue = shipments
+      .filter((s) => s.cargo_type === 'Air Freight')
+      .reduce((sum, s) => sum + (Number(s.total_cost_sar) || 0), 0);
+    const seaRevenue = shipments
+      .filter((s) => s.cargo_type === 'Sea Freight')
+      .reduce((sum, s) => sum + (Number(s.total_cost_sar) || 0), 0);
+    const totalWeight = shipments.reduce((sum, s) => sum + (Number(s.weight_kg) || 0), 0);
+    const airWeight = shipments
+      .filter((s) => s.cargo_type === 'Air Freight')
+      .reduce((sum, s) => sum + (Number(s.weight_kg) || 0), 0);
+    const seaWeight = shipments
+      .filter((s) => s.cargo_type === 'Sea Freight')
+      .reduce((sum, s) => sum + (Number(s.weight_kg) || 0), 0);
+
+    const ugandaCount = shipments.filter((s) => s.receiver_country === 'Uganda').length;
+    const kenyaCount = shipments.filter((s) => s.receiver_country === 'Kenya').length;
+    const otherCount = shipments.length - ugandaCount - kenyaCount;
+
+    return {
+      totalRevenue,
+      airRevenue,
+      seaRevenue,
+      totalWeight,
+      airWeight,
+      seaWeight,
+      ugandaCount,
+      kenyaCount,
+      otherCount,
+      totalCount: shipments.length,
+    };
+  }, [shipments]);
+
+  return (
+    <div className="space-y-8">
+      <div className="border-b border-slate-800 pb-4">
+        <h2 className="text-2xl font-bold text-white tracking-tight">Logistics Operations Analytics</h2>
+        <p className="text-xs text-slate-400 mt-1">
+          Financial throughput, payload tonnage, and corridor distribution across East Africa.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
+          <div className="text-xs text-slate-400 flex items-center justify-between">
+            <span>Gross Revenue</span>
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono tabular-nums">
+            {stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR
+          </div>
+          <div className="text-xs text-slate-500 font-mono">100% of collected logistics fees</div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
+          <div className="text-xs text-slate-400 flex items-center justify-between">
+            <span>Air Freight (23 SAR/kg)</span>
+            <Plane className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-amber-400 font-mono tabular-nums">
+            {stats.airRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR
+          </div>
+          <div className="text-xs text-slate-500 font-mono">
+            {stats.totalRevenue > 0
+              ? `${Math.round((stats.airRevenue / stats.totalRevenue) * 100)}% of total revenue`
+              : '0%'}
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
+          <div className="text-xs text-slate-400 flex items-center justify-between">
+            <span>Sea Freight (13 SAR/kg)</span>
+            <Ship className="w-4 h-4 text-sky-400" />
+          </div>
+          <div className="text-3xl font-extrabold text-sky-400 font-mono tabular-nums">
+            {stats.seaRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} SAR
+          </div>
+          <div className="text-xs text-slate-500 font-mono">
+            {stats.totalRevenue > 0
+              ? `${Math.round((stats.seaRevenue / stats.totalRevenue) * 100)}% of total revenue`
+              : '0%'}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Package className="w-4 h-4 text-amber-400" />
+            Freight Payload Split
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-xs text-slate-300 mb-1.5">
+                <span>Ocean Freight Consolidation ({stats.seaWeight.toLocaleString()} kg)</span>
+                <span className="font-mono text-sky-400 font-bold">
+                  {stats.totalWeight > 0 ? `${Math.round((stats.seaWeight / stats.totalWeight) * 100)}%` : '0%'}
+                </span>
+              </div>
+              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className="h-full bg-sky-500 rounded-full"
+                  style={{
+                    width: `${stats.totalWeight > 0 ? (stats.seaWeight / stats.totalWeight) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs text-slate-300 mb-1.5">
+                <span>Express Air Cargo ({stats.airWeight.toLocaleString()} kg)</span>
+                <span className="font-mono text-amber-400 font-bold">
+                  {stats.totalWeight > 0 ? `${Math.round((stats.airWeight / stats.totalWeight) * 100)}%` : '0%'}
+                </span>
+              </div>
+              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className="h-full bg-amber-500 rounded-full"
+                  style={{
+                    width: `${stats.totalWeight > 0 ? (stats.airWeight / stats.totalWeight) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-sky-400" />
+            Corridor Destination Volume
+          </h3>
+          <div className="space-y-3.5 text-xs">
+            <div className="flex items-center justify-between p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+              <span className="text-slate-300 font-semibold">Uganda (Entebbe / Kampala Hub)</span>
+              <span className="font-mono font-bold text-amber-400">{stats.ugandaCount} consignments</span>
+            </div>
+            <div className="flex items-center justify-between p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+              <span className="text-slate-300 font-semibold">Kenya (Nairobi / Port of Mombasa)</span>
+              <span className="font-mono font-bold text-sky-400">{stats.kenyaCount} consignments</span>
+            </div>
+            <div className="flex items-center justify-between p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+              <span className="text-slate-300 font-semibold">Tanzania / Rwanda / Regional</span>
+              <span className="font-mono font-bold text-slate-400">{stats.otherCount} consignments</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 6. OFFICIAL PRINTABLE WAYBILL MODAL
+// ==========================================
+function OfficialWaybillModal({ shipment, onClose }) {
+  if (!shipment) return null;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+        <div className="no-print p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/90 rounded-t-3xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
+              Official Transport Document
+            </span>
+            <span className="font-mono text-amber-400 font-black text-sm">
+              {shipment.tracking_id}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              Print Shipping Document / Label
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8 bg-white text-slate-950 space-y-6 text-xs font-sans">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-950 pb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="bg-amber-500 text-slate-950 p-1.5 rounded font-black text-lg">
+                  {shipment.cargo_type === 'Air Freight' ? (
+                    <Plane className="w-5 h-5" />
+                  ) : (
+                    <Ship className="w-5 h-5" />
+                  )}
+                </div>
+                <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase">
+                  NYAGO CARGO &amp; LOGISTICS
+                </h1>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-1 font-semibold">
+                Saudi Arabia &bull; East Africa Freight Express Service
+              </p>
+              <p className="text-[10px] text-slate-500">
+                Hubs: Riyadh &bull; Jeddah &bull; Dammam &bull; Kampala &bull; Nairobi
+              </p>
+            </div>
+
+            <div className="text-right">
+              <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                {shipment.cargo_type === 'Air Freight'
+                  ? 'NON-NEGOTIABLE AIR WAYBILL (AWB)'
+                  : 'CONSOLIDATED OCEAN BILL OF LADING'}
+              </div>
+              <div className="text-2xl font-black font-mono tracking-wider text-slate-950 mt-0.5">
+                {shipment.tracking_id}
+              </div>
+              <div className="text-[11px] text-slate-600 font-mono mt-0.5">
+                Issue Date: {new Date(shipment.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 border border-slate-950 divide-y sm:divide-y-0 sm:divide-x divide-slate-950">
+            <div className="p-3.5 space-y-1">
+              <div className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                1. Shipper / Consignor (Saudi Arabia)
+              </div>
+              <div className="font-bold text-sm text-slate-950">{shipment.sender_name}</div>
+              <div className="font-mono text-slate-700">{shipment.sender_phone}</div>
+              <div className="text-slate-700">Origin Depot: {shipment.sender_city}, KSA</div>
+              {shipment.sender_id_iqama && (
+                <div className="font-mono text-[10px] text-slate-600">
+                  National ID / Iqama: {shipment.sender_id_iqama}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3.5 space-y-1">
+              <div className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                2. Consignee / Recipient ({shipment.receiver_country})
+              </div>
+              <div className="font-bold text-sm text-slate-950">{shipment.receiver_name}</div>
+              <div className="font-mono text-slate-700">{shipment.receiver_phone}</div>
+              <div className="text-slate-800 font-medium">
+                {shipment.receiver_address}, {shipment.receiver_city}
+              </div>
+              <div className="font-bold text-slate-950">{shipment.receiver_country}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 border border-slate-950 divide-x divide-slate-950 text-center text-[11px]">
+            <div className="p-2.5">
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Departure Port</span>
+              <span className="font-bold text-slate-950">
+                {shipment.sender_city === 'Jeddah'
+                  ? 'JED / Jeddah Port'
+                  : shipment.sender_city === 'Riyadh'
+                  ? 'RUH / King Khalid Intl'
+                  : 'DMM / King Fahd Intl'}
+              </span>
+            </div>
+            <div className="p-2.5">
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Destination Hub</span>
+              <span className="font-bold text-slate-950">
+                {shipment.receiver_country === 'Uganda'
+                  ? 'EBB / Kampala Station'
+                  : shipment.receiver_country === 'Kenya'
+                  ? 'NBO / Port of Mombasa'
+                  : `${shipment.receiver_city} Hub`}
+              </span>
+            </div>
+            <div className="p-2.5">
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Service Mode</span>
+              <span className="font-bold text-slate-950">{shipment.cargo_type}</span>
+            </div>
+            <div className="p-2.5">
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Target Delivery</span>
+              <span className="font-mono font-bold text-slate-950">{shipment.estimated_delivery}</span>
+            </div>
+          </div>
+
+          <div className="border border-slate-950">
+            <table className="w-full text-left text-[11px]">
+              <thead className="bg-slate-100 border-b border-slate-950 text-[10px] uppercase font-bold text-slate-700">
+                <tr>
+                  <th className="p-2 border-r border-slate-950">Pieces</th>
+                  <th className="p-2 border-r border-slate-950">Package Type</th>
+                  <th className="p-2 border-r border-slate-950">Gross Weight</th>
+                  <th className="p-2 border-r border-slate-950">Declared Contents</th>
+                  <th className="p-2 text-right">Declared Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-300">
+                <tr>
+                  <td className="p-2 border-r border-slate-950 font-mono font-bold text-center">
+                    {shipment.package_count}
+                  </td>
+                  <td className="p-2 border-r border-slate-950 font-medium">{shipment.package_type}</td>
+                  <td className="p-2 border-r border-slate-950 font-mono font-bold">
+                    {shipment.weight_kg} kg
+                  </td>
+                  <td className="p-2 border-r border-slate-950 font-medium">
+                    {shipment.goods_description}
+                  </td>
+                  <td className="p-2 text-right font-mono font-bold">
+                    {shipment.declared_value_sar || 0} SAR
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="border border-slate-950 p-3 text-[11px] space-y-1">
+              <div className="font-bold uppercase text-[10px] text-slate-600">Handling &amp; Customs</div>
+              <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Security Screened &bull; Customs Export Bonded
+              </div>
+              <p className="text-[10px] text-slate-600 leading-tight">
+                Consignment verified safe for air transport or ocean container stowage under KSA ZATCA &amp; IATA/IMO regulations.
+              </p>
+            </div>
+            <div className="border border-slate-950 p-3 text-[11px] space-y-1 text-right">
+              <div className="flex justify-between text-slate-600">
+                <span>Freight ({shipment.rate_per_kg} SAR/kg):</span>
+                <span className="font-mono">{Number(shipment.base_cost_sar || 0).toFixed(2)} SAR</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Documentation / Intake:</span>
+                <span className="font-mono">{Number(shipment.handling_fee_sar || 0).toFixed(2)} SAR</span>
+              </div>
+              {shipment.insurance_fee_sar > 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Transit Insurance:</span>
+                  <span className="font-mono">{Number(shipment.insurance_fee_sar || 0).toFixed(2)} SAR</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-sm text-slate-950 pt-1 border-t border-slate-300">
+                <span>Total Amount:</span>
+                <span className="font-mono">{Number(shipment.total_cost_sar || 0).toFixed(2)} SAR</span>
+              </div>
+              <div className="text-[10px] font-mono text-slate-600">
+                Status: <strong className="text-slate-950 uppercase">{shipment.payment_status}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t-2 border-slate-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="inline-flex items-center gap-1 h-12 px-2 bg-white">
+                {Array.from({ length: 48 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`bg-slate-950 h-full ${
+                      i % 7 === 0 || i % 5 === 0 ? 'w-1' : i % 3 === 0 ? 'w-1.5' : 'w-0.5'
+                    } ${i % 11 === 0 ? 'opacity-0' : 'opacity-100'}`}
+                  />
+                ))}
+              </div>
+              <div className="font-mono text-center font-bold tracking-widest text-xs text-slate-950">
+                *{shipment.tracking_id}*
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-[10px] text-center">
+              <div className="w-32 border-b border-slate-950 pb-1">
+                <div className="h-8" />
+                <span>Shipper Signature</span>
+              </div>
+              <div className="w-32 border-b border-slate-950 pb-1">
+                <div className="h-8 font-mono text-slate-400 flex items-center justify-center">
+                  [STAMP: NYAGO]
+                </div>
+                <span>Authorized Cargo Agent</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
